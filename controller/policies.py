@@ -18,21 +18,23 @@ import math
 import re
 
 from .governance import CLIENT_PREFS, changed_dims, dist, max_shift, tv
-from .stats import binom_excess_z, holm, norm_sf, two_prop_z, wilson
+from .stats import binom_excess_z, holm, norm_sf, poisson_sf, two_prop_z, wilson
 from .util import DAY, fmt_minute
 
 FEATURES = ("lang", "city_tier", "age_band", "value_band")
 
 # ---- tunables (see SUBMISSION.md §5 for the reasoning behind each)
 EXPLORE_TOTAL = 0.30      # share of a dim's traffic given to challengers while exploring
-HOLDOUT = 0.10            # share kept on the old control after promotion, for decay detection
+HOLDOUT = 0.15            # share kept on the old control after promotion: the drift-proof yardstick for decay
 N_MIN = {"engagement_rate": 400, "pickup_rate": 1200}   # per-arm sample before any look
 ALPHA_LOOK = 0.015        # one-sided per daily look, Holm across arms; ≈ Pocock nominal level for 5 looks
 MAX_COHORTS = 4           # cohorts we create per workflow (sim allows 20); more fragments traffic
 SEG_MIN = 200             # per-arm connected calls inside a segment before it can be tested
 DECAY_WINDOW_H = 24
 COOLDOWN_MIN = DAY        # after close/rollback/supervisor edit, wait before re-experimenting on a dim
-HALLUC = {"window_h": 6, "min_conn": 120, "mult": 2.5, "z": 4.0}
+HALLUC = {"window_h": 6, "min_conn": 120, "mult": 3.0, "p": 1e-7, "p_after_change": 1e-4, "z": 4.0}
+RECENT_H = 48             # window for catching arms that faded after looking fine
+DID_MAX_SHARE = 0.6       # never concentrate dialling on one number: volume drives spam flags
 DID = {"window_h": 3, "min_dials": 120, "z": -3.5, "ratio": 0.7}
 CREDIT_FLOOR = 10         # never spend below this (reserve for the next incident)
 INCIDENT_CREDIT_CAP = 15
@@ -154,7 +156,12 @@ class Brain:
         r = self.sums(wf, f"prompt_version={prompt}", max(hf, since))
         conn, hal = r[1], r[3]
         z = binom_excess_z(hal, conn, p0)
-        bad = conn >= HALLUC["min_conn"] and hal >= 5 and rate(hal, conn) >= HALLUC["mult"] * p0 and z >= HALLUC["z"]
+        pval = poisson_sf(hal, conn * p0)
+        # a recent prompt change is a strong prior that something changed, so the bar is lower right after one;
+        # otherwise ~1500 overlapping checks per run need a very small p to keep false alarms rare
+        recent_change = self.now_h() - since <= 12
+        bar = HALLUC["p_after_change"] if recent_change else HALLUC["p"]
+        bad = conn >= HALLUC["min_conn"] and rate(hal, conn) >= HALLUC["mult"] * p0 and pval <= bar
 
         if inc and inc["state"] in ("resolved", "abandoned") and inc["bad_prompt"] != prompt:
             inc = None
@@ -163,10 +170,11 @@ class Brain:
                 return []
             inc = {"id": f"inc-{wf}-{self.s.now}", "bad_prompt": prompt, "opened": self.s.now, "state": "open",
                    "tried": [], "validated": {}, "credits": 0, "detect": {"conn": conn, "halluc": hal,
-                   "rate": round(rate(hal, conn), 4), "baseline": round(p0, 4), "z": round(z, 1)}}
+                   "rate": round(rate(hal, conn), 4), "baseline": round(p0, 4), "z": round(z, 1), "p": pval,
+                   "after_prompt_change": recent_change}}
             self._save_inc(wf, inc, "incident_opened",
                            f"hallucination {rate(hal, conn):.1%} on {prompt} vs baseline {p0:.1%} "
-                           f"({hal}/{conn} connected, z={z:.1f})")
+                           f"({hal}/{conn} connected, p={pval:.1e})")
         if inc["state"] == "verifying":
             return self._verify_fix(wf, inc, prompt)
         if inc["state"] in ("resolved", "abandoned"):
@@ -397,9 +405,24 @@ class Brain:
         control = max(d, key=d.get)
         bad = set(self.s.get(f"did_bad:{wf}", {})) if dim == "caller_id" else set()
         ch = [o for o in w["options"][dim] if o != control and o not in self._retired(wf, dim) and o not in bad]
+        # use what we already learned: don't re-test an option our own data already shows is worse than control
+        metric = metric_of(w)
+        cr = sn(self.sums(wf, f"{dim}={control}|cohort=default", 0), metric)
+        known_worse = {}
+        for o in ch:
+            orr = sn(self.sums(wf, f"{dim}={o}|cohort=default", 0), metric)
+            if orr[1] >= 300 and cr[1] >= 300:
+                z = two_prop_z(orr[0], orr[1], cr[0], cr[1])
+                if z < -1.0:
+                    known_worse[o] = round(z, 2)
+        ch = [o for o in ch if o not in known_worse][:3]
         if not ch:
+            if known_worse and not self.s.get(f"nothing_to_test:{wf}:{dim}:{control}"):
+                with self.s.tx() as db:
+                    self.s.put(f"nothing_to_test:{wf}:{dim}:{control}", True, db)
+                    self.s.decide(wf, "experiment_skipped", f"{dim}: every alternative already measured worse "
+                                  f"than {control}", {"z_vs_control": known_worse}, db=db)
             return
-        ch = ch[:3]
         arms = {control: 1 - EXPLORE_TOTAL, **{o: EXPLORE_TOTAL / len(ch) for o in ch}}
         n = self.s.q1("SELECT COUNT(*) FROM experiments WHERE wf=?", wf)[0]
         exp_id = f"{wf}:{dim}:{n + 1}"
@@ -457,6 +480,9 @@ class Brain:
         if look["verdict"] == "promote":
             win = look["winner"]
             new = {win: 1 - HOLDOUT, control: HOLDOUT}
+            if dim == "caller_id":   # spread load: winner capped, the rest across the other healthy numbers
+                others = [o for o in arms if o != win]
+                new = {win: DID_MAX_SHARE, **{o: (1 - DID_MAX_SHARE) / len(others) for o in others}}
             protect = look.get("protect", [])
             lift = A[win]["rate"] / max(A[control]["rate"], 1e-9) - 1
             alloc = {"default": {dim: new}}
@@ -485,7 +511,7 @@ class Brain:
                 "operational": False, "alloc": {sw["id"]: {dim: new}},
                 "new_cohorts": [{"id": sw["id"], "where": sw["where"],
                                  "reason": f"{sw['winner']} wins on {metric} for this segment"}],
-                "ref": sw["stats"][sw["winner"]],
+                "ref": sw["stats"][sw["winner"]], "ref_c": sw["stats"][control],
                 "summary": f"For cohort {sw['id']}: use {dim} {sw['winner']} (+{sw['lift']:.1%} {metric} vs {control})",
                 "rationale": (f"Within {sw['where']}, {sw['winner']} {sw['stats'][sw['winner']]} vs {control} "
                               f"{sw['stats'][control]} (Holm over {look['segment_tests']} segment tests, p<{ALPHA_LOOK}). "
@@ -541,6 +567,22 @@ class Brain:
         z = {o: two_prop_z(A[o]["s"], A[o]["n"], cs, cn) for o in ready}
         winners = holm({o: norm_sf(z[o]) for o in ready}, ALPHA_LOOK)
         losers = holm({o: norm_sf(-z[o]) for o in ready}, ALPHA_LOOK)
+        # an arm can look fine overall and fade later: test the last RECENT_H hours too (separate Holm family)
+        h_recent = max(h, self.now_h() - RECENT_H)
+        if h_recent > h:
+            rs = self._arm_stats(wf, dim, arms, h_recent)
+            rc = sn(rs[control], metric)
+            zr = {o: two_prop_z(*sn(rs[o], metric), *rc) for o in ch if sn(rs[o], metric)[1] >= need // 2}
+            faded = holm({o: norm_sf(-v) for o, v in zr.items()}, ALPHA_LOOK)
+            if faded - losers:
+                res["faded_recently"] = {o: round(zr[o], 2) for o in faded}
+            losers |= faded
+            winners -= faded
+            # a winner must still be ahead lately, or we'd promote something that is already fading
+            not_lately = {o for o in winners if zr.get(o, 0.0) < 1.28}   # no recent data = no promotion
+            if not_lately:
+                res["not_ahead_recently"] = {o: round(zr[o], 2) for o in not_lately}
+            winners -= not_lately
         res["z"] = {o: round(v, 2) for o, v in z.items()}
         ok = []
         max_drop = list(w["objective"]["guardrail"].values())[0]
@@ -610,6 +652,15 @@ class Brain:
         if not pv:
             return None
         hits = holm(pv, ALPHA_LOOK)
+        h_recent = self.now_h() - RECENT_H
+        if h_recent > h:   # the segment winner must still be ahead lately
+            keep = set()
+            for f, v, o in hits:
+                a = sn(self.sums(wf, f"{dim}={o}|{f}={v}", h_recent), "engagement_rate")
+                b = sn(self.sums(wf, f"{dim}={control}|{f}={v}", h_recent), "engagement_rate")
+                if a[1] >= SEG_MIN // 2 and two_prop_z(a[0], a[1], b[0], b[1]) >= 1.28:
+                    keep.add((f, v, o))
+            hits = keep
         if not hits:
             return None
         best = max(hits, key=lambda k: info[k]["lift"] * info[k]["share"])
@@ -648,17 +699,23 @@ class Brain:
         ws, wn = sn(r[winner], metric)
         hs, hn = sn(r[control], metric)
         ref_s, ref_n = notes.get("ref_s", 0), notes.get("ref_n", 0)
-        if wn < (300 if cohort == "default" else 150) or ref_n == 0:
-            return []
+        ref_cs, ref_cn = notes.get("ref_cs", 0), notes.get("ref_cn", 0)
+        if wn < 300 or hn < 150 or ref_n == 0:
+            return []   # holdout too thin: comparing the winner to its own past is confounded by drift, so wait
+        # decay = the winner's lead over the holdout (same hours, same drift) has shrunk, or it's now behind
+        cur_up = rate(ws, wn) - rate(hs, hn)
+        ref_up = notes.get("ref_uplift", 0)
+        var = lambda s_, n_: max(rate(s_, n_) * (1 - rate(s_, n_)), 1e-6) / max(n_, 1)
+        se = math.sqrt(var(ws, wn) + var(hs, hn) + (var(ref_s, ref_n) + var(ref_cs, ref_cn) if ref_cn else 0))
+        z_up = (cur_up - ref_up) / se
+        z_hold = two_prop_z(ws, wn, hs, hn)
         z_self = two_prop_z(ws, wn, ref_s, ref_n)
-        z_hold = two_prop_z(ws, wn, hs, hn) if hn >= 100 else 0.0
-        ref_uplift = notes.get("ref_uplift", 0)
-        cur_uplift = rate(ws, wn) - rate(hs, hn) if hn >= 100 else ref_uplift
-        decayed = (z_self < -3.0 and cur_uplift < ref_uplift / 2) or z_hold < -2.58
+        decayed = z_up < -2.58 or z_hold < -2.33
         if not decayed:
             return []
         info = {"cohort": cohort, "window_h": DECAY_WINDOW_H, "winner_recent": [ws, wn], "holdout_recent": [hs, hn],
-                "winner_at_promotion": [ref_s, ref_n], "z_self": round(z_self, 2), "z_vs_holdout": round(z_hold, 2)}
+                "winner_at_promotion": [ref_s, ref_n], "uplift_then": round(ref_up, 4), "uplift_now": round(cur_up, 4),
+                "z_uplift_drop": round(z_up, 2), "z_vs_holdout": round(z_hold, 2), "z_self": round(z_self, 2)}
         if not self.s.get(f"decay_logged:{exp_id}"):
             with self.s.tx() as db:
                 self.s.put(f"decay_logged:{exp_id}", True, db)
@@ -667,9 +724,10 @@ class Brain:
             "key": f"exp_rollback:{exp_id}", "kind": "exp_rollback", "exp_id": exp_id, "winner": winner,
             "dim": dim, "urgent": True, "operational": dim == "caller_id", "alloc": {cohort: {dim: {control: 1.0}}},
             "summary": f"Roll back {dim} {winner} → {control} for {cohort}: its advantage has faded",
-            "rationale": (f"Last {DECAY_WINDOW_H}h: {winner} {rate(ws, wn):.1%} (n={wn}) vs {rate(ref_s, ref_n):.1%} when "
-                          f"promoted (z={z_self:.1f}); holdout {control} {rate(hs, hn):.1%} (n={hn}, z={z_hold:.1f})."),
-            "impact": min(1.0, max(0.1, -z_self / 10)), "dry_run": info,
+            "rationale": (f"Last {DECAY_WINDOW_H}h: {winner} {rate(ws, wn):.1%} (n={wn}) vs holdout {control} "
+                          f"{rate(hs, hn):.1%} (n={hn}); its lead went from {ref_up:+.1%} to {cur_up:+.1%} "
+                          f"(z={z_up:.1f})."),
+            "impact": min(1.0, max(0.1, (ref_up - cur_up) / max(rate(hs, hn), 1e-6) / 0.10)), "dry_run": info,
         }]
 
     # ------------------------------------------------------------------ apply callback (idempotent)
@@ -686,15 +744,18 @@ class Brain:
                 A = (self.s.get(f"look:{i['exp_id']}") or {}).get("arms", {})
                 win, ctrl = i["winner"], i["control"]
                 notes = {"promo_h": self.s.now // 60, "ref_s": A.get(win, {}).get("s", 0),
-                         "ref_n": A.get(win, {}).get("n", 0),
+                         "ref_n": A.get(win, {}).get("n", 0), "ref_cs": A.get(ctrl, {}).get("s", 0),
+                         "ref_cn": A.get(ctrl, {}).get("n", 0),
                          "ref_uplift": A.get(win, {}).get("rate", 0) - A.get(ctrl, {}).get("rate", 0)}
                 db.execute("UPDATE experiments SET status='promoted', winner=?, decided_minute=?, promo_day=?, "
                            "notes=? WHERE exp_id=? AND status='running'",
                            (win, self.s.now, self.s.now // DAY, json.dumps(notes), i["exp_id"]))
             elif k == "seg_promote":
                 s_, n_ = (int(x) for x in i["ref"].split("/"))
+                cs_, cn_ = (int(x) for x in i["ref_c"].split("/"))
                 eid = f"{i['exp_id']}@{i['cohort']}"
-                notes = {"promo_h": self.s.now // 60, "ref_s": s_, "ref_n": n_, "ref_uplift": 0}
+                notes = {"promo_h": self.s.now // 60, "ref_s": s_, "ref_n": n_, "ref_cs": cs_, "ref_cn": cn_,
+                         "ref_uplift": rate(s_, n_) - rate(cs_, cn_)}
                 db.execute("INSERT OR IGNORE INTO experiments (exp_id, wf, cohort_id, dim, metric, status, control,"
                            " arms, winner, started_minute, decided_minute, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                            (eid, wf, i["cohort"], i["dim"], "engagement_rate", "promoted", i["control"],

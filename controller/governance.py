@@ -103,9 +103,13 @@ class Governance:
         return self.s.q1("SELECT COUNT(*) FROM proposals WHERE wf=? AND path='approval' AND status!='failed'"
                          " AND created_minute > ?", wf, self.s.now - DAY)[0]
 
-    def request_limit(self, wf):
+    def request_limit(self, wf, urgent=False):
+        """Policy limit, tightened by a client's own ask for routine work. Incident fixes may use the full policy
+        limit: a supervisor's 'two a day' shouldn't keep a hallucinating prompt live overnight."""
         w = self.wfs[wf]
         lim = w["governance"]["max_requests_per_24h"]
+        if urgent:
+            return lim
         pref = CLIENT_PREFS.get(w["tenant_id"], {})
         return min(lim, pref.get("max_requests_per_24h", lim))
 
@@ -119,8 +123,8 @@ class Governance:
         last_ok = hi * 60 - (30 if urgent else min(lat_hi, 240))
         if not (lo * 60 <= self.s.now % DAY < last_ok) or hour >= hi:
             return False, "outside approver hours"
-        used, lim = self.requests_last_24h(wf), self.request_limit(wf)
-        budget = lim if urgent else max(lim - 1, 1)  # keep one slot for incidents
+        used, lim = self.requests_last_24h(wf), self.request_limit(wf, urgent)
+        budget = lim if urgent else max(lim - 1, 1)  # routine work keeps one slot free for incidents
         if used >= budget:
             return False, f"24h request budget used ({used}/{lim})"
         inflight = [r for r in self.open_proposals(wf) if r[2] == "approval"]

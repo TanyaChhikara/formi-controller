@@ -59,3 +59,15 @@ def binom_excess_z(k, n, p0) -> float:
         return 0.0
     sd = math.sqrt(max(n * p0 * (1 - p0), 1e-12))
     return (k - n * p0) / sd
+
+
+def poisson_sf(k, mu) -> float:
+    """P(X >= k) for X ~ Poisson(mu). Exact enough for small rates, where the normal approx overstates z."""
+    if k <= 0:
+        return 1.0
+    term = math.exp(-mu)
+    cdf = term
+    for i in range(1, k):
+        term *= mu / i
+        cdf += term
+    return max(0.0, 1.0 - cdf)
