@@ -32,6 +32,7 @@ MAX_COHORTS = 4           # cohorts we create per workflow (sim allows 20); more
 SEG_MIN = 200             # per-arm connected calls inside a segment before it can be tested
 DECAY_WINDOW_H = 24
 COOLDOWN_MIN = DAY        # after close/rollback/supervisor edit, wait before re-experimenting on a dim
+RETIRE_MIN = 7 * DAY      # a losing option is not re-tested for a week
 HALLUC = {"window_h": 6, "min_conn": 120, "mult": 3.0, "p": 1e-7, "p_after_change": 1e-4, "z": 4.0}
 RECENT_H = 48             # window for catching arms that faded after looking fine
 DID_MAX_SHARE = 0.6       # never concentrate dialling on one number: volume drives spam flags
@@ -398,7 +399,19 @@ class Brain:
         return out
 
     def _retired(self, wf, dim):
-        return set(self.s.get(f"retired:{wf}:{dim}", []))
+        """Options that lost (pruned, or a winner that faded) sit out RETIRE_MIN before being tested again."""
+        r = self.s.get(f"retired:{wf}:{dim}", {})
+        if isinstance(r, list):
+            r = {o: self.s.now for o in r}
+        return {o for o, m in r.items() if self.s.now - m < RETIRE_MIN}
+
+    def _retire(self, wf, dim, opts, db):
+        r = self.s.get(f"retired:{wf}:{dim}", {})
+        if isinstance(r, list):
+            r = {o: self.s.now for o in r}
+        for o in opts:
+            r[o] = self.s.now
+        self.s.put(f"retired:{wf}:{dim}", r, db)
 
     def _plan_experiment(self, wf, w, cur, dim):
         d = dist(cur["config"], "default", dim)
@@ -529,7 +542,8 @@ class Brain:
                 return []
             return [{
                 "key": f"exp_{look['verdict']}:{exp_id}:{','.join(sorted(new))}", "kind": f"exp_{look['verdict']}",
-                "exp_id": exp_id, "new_arms": new, "urgent": False, "operational": dim == "caller_id",
+                "exp_id": exp_id, "new_arms": new, "losers": look["losers"], "urgent": False,
+                "operational": dim == "caller_id",
                 "alloc": {"default": {dim: new}},
                 "summary": (f"Stop testing {look['losers']} on {dim} (worse than {control})" if look["verdict"] == "prune"
                             else f"End {dim} test: every challenger lost to {control}"),
@@ -580,6 +594,15 @@ class Brain:
             winners -= faded
             # a winner must still be ahead lately, or we'd promote something that is already fading
             not_lately = {o for o in winners if zr.get(o, 0.0) < 1.28}   # no recent data = no promotion
+            # trend guard: over the last 24h the lift must still be at least half the all-time lift (point estimate)
+            r24 = self._arm_stats(wf, dim, arms, max(h, self.now_h() - 24))
+            c24 = rate(*sn(r24[control], metric))
+            for o in winners - not_lately:
+                lift_all = A[o]["rate"] - A[control]["rate"]
+                lift_24 = rate(*sn(r24[o], metric)) - c24
+                if lift_24 < 0.5 * lift_all:
+                    not_lately.add(o)
+                    res.setdefault("trend_guard", {})[o] = {"lift_all": round(lift_all, 4), "lift_24h": round(lift_24, 4)}
             if not_lately:
                 res["not_ahead_recently"] = {o: round(zr.get(o, 0.0), 2) for o in not_lately}
             winners -= not_lately
@@ -777,14 +800,15 @@ class Brain:
                             json.dumps(notes)))
             elif k == "exp_prune":
                 db.execute("UPDATE experiments SET arms=? WHERE exp_id=?", (json.dumps(i["new_arms"]), i["exp_id"]))
+                self._retire(wf, i["exp_id"].split(":")[1], i.get("losers", []), db)
             elif k == "exp_close":
+                self._retire(wf, i["exp_id"].split(":")[1], i.get("losers", []), db)
                 db.execute("UPDATE experiments SET status='closed', decided_minute=?, notes=? WHERE exp_id=?",
                            (self.s.now, "every challenger lost", i["exp_id"]))
             elif k == "exp_rollback":
                 db.execute("UPDATE experiments SET status='rolled_back', decided_minute=? WHERE exp_id=?",
                            (self.s.now, i["exp_id"]))
-                ret = set(self.s.get(f"retired:{wf}:{i['dim']}", [])) | {i["winner"]}
-                self.s.put(f"retired:{wf}:{i['dim']}", sorted(ret), db)
+                self._retire(wf, i["dim"], [i["winner"]], db)
             elif k == "did_fix":
                 # the caller-ID mix changed under any running caller-ID test: end it, a new one re-plans
                 db.execute("UPDATE experiments SET status='closed', decided_minute=?, notes=? WHERE wf=? AND "

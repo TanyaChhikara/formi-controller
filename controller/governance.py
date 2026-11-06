@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import copy
 import json
-import uuid
+import hashlib
 
 from .client import SimError
 from .store import Store
@@ -146,9 +146,17 @@ class Governance:
         return max_shift(old, new) <= pol.get("max_shift", 0) + 1e-9
 
     # ------------------------------------------------------------------ submit
+    def _pid(self, prefix, wf, intents):
+        """Deterministic id: same decision at the same sim minute → same id (reproducible runs, safe resends).
+        A re-proposal later gets a new id because the minute differs."""
+        h = hashlib.sha1(json.dumps([i["key"] for i in intents]).encode()).hexdigest()[:8]
+        pid = f"{prefix}-{wf}-{self.s.now}-{h}"
+        n = self.s.q1("SELECT COUNT(*) FROM proposals WHERE proposal_id LIKE ?", pid + "%")[0]
+        return pid if n == 0 else f"{pid}-{n}"
+
     def submit_auto(self, wf, new_cfg, intents, rationale, evidence=None):
         cur = self.current[wf]
-        pid = f"auto-{wf}-{uuid.uuid4().hex[:10]}"
+        pid = self._pid("auto", wf, intents)
         body = {"proposal_id": pid, "base_version": cur["version"], "proposed_config": new_cfg,
                 "rationale": rationale, "evidence": evidence or {}}
         with self.s.tx() as db:
@@ -173,7 +181,7 @@ class Governance:
     def submit_approval(self, wf, new_cfg, intents, urgent, payload):
         """payload: change_summary, diff, affected_leads, dry_run, impact_score, rationale, evidence."""
         cur = self.current[wf]
-        pid = f"prop-{wf}-{uuid.uuid4().hex[:10]}"
+        pid = self._pid("prop", wf, intents)
         ttl = self.wfs[wf]["governance"]["proposal_ttl_hours"]
         body = {"proposal_id": pid, "workflow_id": wf, "base_version": cur["version"],
                 "proposed_config": new_cfg, "expires_in_hours": ttl, **payload}
