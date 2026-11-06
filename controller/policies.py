@@ -847,7 +847,11 @@ class Brain:
                     auto.append((i, step))
                     continue
             appr.append(i)
-        for i, step in auto[:1]:     # one auto change per tick; the next tick re-plans on the new version
+        # one auto change per workflow per tick — counted from the store, so a restart mid-tick doesn't do two
+        if auto and self.s.q1("SELECT COUNT(*) FROM proposals WHERE wf=? AND path='auto' AND created_minute=?",
+                              wf, self.s.now)[0]:
+            auto = []
+        for i, step in auto[:1]:     # the next tick re-plans on the new version
             self.gov.submit_auto(wf, step, [i], i["rationale"], i.get("evidence"))
             return
         if not appr:

@@ -229,10 +229,26 @@ class Governance:
                 self.s.decide(wf, "reconciled", "found in-flight approval after restart", {},
                               pid, found[0]["approval_id"], db=db)
                 return found[0]["approval_id"]
-            # never reached the simulator: drop it, policies will re-propose with fresh data
-            db.execute("UPDATE proposals SET status='failed', reasons='\"never sent (crash)\"' "
-                       "WHERE proposal_id=?", (pid,))
-        return None
+            row = db.execute("SELECT created_minute, body FROM proposals WHERE proposal_id=?", (pid,)).fetchone()
+            if row[0] != self.s.now:
+                # never reached the simulator and time has moved on: drop it, policies re-propose with fresh data
+                db.execute("UPDATE proposals SET status='failed', reasons='\"never sent (crash)\"' "
+                           "WHERE proposal_id=?", (pid,))
+                return None
+        # same sim minute (the world waited for us): send exactly the request we had decided on, same id
+        body = json.loads(row[1])
+        try:
+            r = self.sim.post("/approvals", body)
+        except SimError as e:
+            with self.s.tx() as db:
+                db.execute("UPDATE proposals SET status=?, reasons=? WHERE proposal_id=?",
+                           ("stale" if e.code == "stale_base_version" else "failed", json.dumps(e.body), pid))
+            return None
+        with self.s.tx() as db:
+            db.execute("UPDATE proposals SET status='pending', approval_id=? WHERE proposal_id=?", (r["approval_id"], pid))
+            self.s.decide(wf, "proposal_sent", f"(resent after restart) {body['change_summary']}", {}, pid,
+                          r["approval_id"], db=db)
+        return r["approval_id"]
 
     def _reconcile_auto(self, pid, wf):
         hist = self.sim.get(f"/workflows/{wf}/config/history")
@@ -244,7 +260,7 @@ class Governance:
         with self.s.tx() as db:
             db.execute("UPDATE proposals SET status='failed', reasons='\"never sent (crash)\"' "
                        "WHERE proposal_id=?", (pid,))
-        return None
+        return None   # auto changes are cheap to recompute: the next tick re-plans (with a new id)
 
     def reconcile_and_apply(self):
         """Every tick (and on startup): advance every open proposal using the simulator as the source of truth."""

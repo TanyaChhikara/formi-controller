@@ -1,0 +1,117 @@
+{
+  "as_of": "D10 00:00",
+  "workflows": {
+    "ks_cancel": {
+      "being_tested": [
+        {
+          "id": "ks_cancel:voice:2",
+          "cohort": "default",
+          "dim": "voice",
+          "status": "running",
+          "control": "V1",
+          "winner": null,
+          "traffic": {
+            "V1": 0.7,
+            "V2": 0.09999999999999999,
+            "V3": 0.09999999999999999,
+            "V4": 0.09999999999999999
+          },
+          "latest_look": {
+            "V1": "3322/6612 = 50.2%",
+            "V2": "464/952 = 48.7%",
+            "V3": "482/948 = 50.8%",
+            "V4": "457/888 = 51.5%"
+          },
+          "verdict": "continue"
+        }
+      ],
+      "winning_now": [
+        {
+          "id": "ks_cancel:welcome_message:1",
+          "cohort": "default",
+          "dim": "welcome_message",
+          "status": "promoted",
+          "control": "W1",
+          "winner": "W2",
+          "traffic": {
+            "W1": 0.7,
+            "W2": 0.15,
+            "W3": 0.15
+          },
+          "latest_look": {
+            "W1": "2194/4511 = 48.6%",
+            "W2": "518/974 = 53.2%",
+            "W3": "495/999 = 49.5%"
+          },
+          "verdict": "promote"
+        }
+      ],
+      "waiting_for_you": [],
+      "changed_today": [],
+      "cohorts": [
+        {
+          "id": "default",
+          "where": {},
+          "why": "everyone not in a more specific cohort"
+        }
+      ],
+      "incident": {
+        "id": "inc-ks_cancel-5100",
+        "bad_prompt": "P2",
+        "opened": 5100,
+        "state": "resolved",
+        "tried": [],
+        "validated": {
+          "P1": {
+            "run_id": "val_00001",
+            "pass_rate": 0.9867,
+            "n": 300
+          }
+        },
+        "credits": 3,
+        "detect": {
+          "conn": 158,
+          "halluc": 11,
+          "rate": 0.0696,
+          "baseline": 0.0147,
+          "z": 5.7,
+          "p": 3.198945979054901e-05,
+          "after_prompt_change": true
+        },
+        "fixed_h": 87,
+        "fixed_minute": 5190,
+        "verify": {
+          "conn": 228,
+          "halluc_rate": 0.0263,
+          "engagement": 0.4781,
+          "baseline_engagement": 0.5067,
+          "halluc_z": 1.5,
+          "engage_z": -0.9
+        }
+      },
+      "quarantined_caller_ids": {
+        "D2": {
+          "minute": 3600,
+          "pickup": 0.1455,
+          "ref": 0.2458,
+          "z": -4.4,
+          "dials": 598
+        },
+        "D1": {
+          "minute": 6780,
+          "pickup": 0.1592,
+          "ref": 0.2515,
+          "z": -6.8,
+          "dials": 1200
+        },
+        "D3": {
+          "minute": 11400,
+          "pickup": 0.1737,
+          "ref": 0.2501,
+          "z": -4.7,
+          "dials": 800
+        }
+      }
+    }
+  }
+}

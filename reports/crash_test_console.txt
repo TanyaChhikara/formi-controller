@@ -1,0 +1,21 @@
+=== kill -9 #1 after 2.5s at 2027-01-04T00:00:00+05:30
+=== kill -9 #2 after 2.8s at 2027-01-04T07:30:00+05:30
+=== kill -9 #3 after 3.3s at 2027-01-05T18:30:00+05:30
+=== kill -9 #4 after 3.5s at 2027-01-07T12:30:00+05:30
+=== kill -9 #5 after 3.2s at 2027-01-08T17:00:00+05:30
+=== kill -9 #6 after 3.4s at 2027-01-10T01:30:00+05:30
+=== kill -9 #7 after 3.4s at 2027-01-11T11:00:00+05:30
+=== kill -9 #8 after 3.2s at 2027-01-12T15:00:00+05:30
+=== final restart, run to completion
+=== exit code 0
+calls nw_renewal: simulator=84795 controller=84795 OK
+calls ks_cancel: simulator=113056 controller=113056 OK
+calls nw_kyc: simulator=47199 controller=47199 OK
+approvals nw_renewal: 4 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
+approvals nw_kyc: 5 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
+approvals ks_cancel: 2 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
+CONSISTENT
+| ALL | 0.389 | +15.8% | 0.248 | +11.0% | 0.545 | +2.7% | 22% | 161 (406) |
+18 applied — beneficial: 15, neutral: 3
+  "apply_conflicts": 0,
+  "lapsed": 0,
