@@ -11,7 +11,7 @@
 - Deliberately not built: per-person call time (C4), cross-tenant fairness (C15), a UI (C11 is a JSON/CLI view).
 
 ## 1. Assumptions
-0. `engagement_rate_max_drop: 0.02` / `pickup_rate_max_drop: 0.02` are absolute (percentage points).
+1. `engagement_rate_max_drop: 0.02` / `pickup_rate_max_drop: 0.02` are absolute (percentage points).
 1. The approver's identity isn't exposed by the API, so "who approved" = the workflow's client approver + `approval_id` + timestamps. In production this would be a named user.
 2. Engagement levers are welcome message and voice; pickup levers are caller ID (and schedule). So engagement-primary workflows test welcome/voice and pickup-primary workflows test caller ID. I don't test welcome/voice on pickup-primary workflows (no effect on their primary KPI, and it would spend their 2/day approval budget).
 3. "Customer-facing" = welcome, voice, prompt, cohorts. Even where policy allows auto-applying them (Kestrel), I send them for approval (see §6).
