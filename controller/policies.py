@@ -581,7 +581,7 @@ class Brain:
             # a winner must still be ahead lately, or we'd promote something that is already fading
             not_lately = {o for o in winners if zr.get(o, 0.0) < 1.28}   # no recent data = no promotion
             if not_lately:
-                res["not_ahead_recently"] = {o: round(zr[o], 2) for o in not_lately}
+                res["not_ahead_recently"] = {o: round(zr.get(o, 0.0), 2) for o in not_lately}
             winners -= not_lately
         res["z"] = {o: round(v, 2) for o, v in z.items()}
         ok = []
@@ -710,8 +710,22 @@ class Brain:
         z_up = (cur_up - ref_up) / se
         z_hold = two_prop_z(ws, wn, hs, hn)
         z_self = two_prop_z(ws, wn, ref_s, ref_n)
-        decayed = z_up < -2.58 or z_hold < -2.33
+        # A shrinking lead is not a loss: only roll back once the winner is no longer ahead of the holdout.
+        # Rolling windows re-tested every tick are a multiple-testing trap, so we test every 6h and need the
+        # signal on two consecutive checks before acting (≈ +6h detection delay, far fewer false rollbacks).
+        sig = cur_up <= 0 and (z_up < -3.0 or z_hold < -2.58)
+        streak_key = f"decay_streak:{exp_id}"
+        streak = self.s.get(streak_key, {"n": 0, "h": -1})
+        if h1 % 6 == 0 and streak["h"] != h1:
+            streak = {"n": streak["n"] + 1 if sig else 0, "h": h1}
+            self.s.put(streak_key, streak)
+        decayed = streak["n"] >= 2
         if not decayed:
+            if z_up < -2.58 and not self.s.get(f"shrink_logged:{exp_id}"):
+                with self.s.tx() as db:
+                    self.s.put(f"shrink_logged:{exp_id}", True, db)
+                    self.s.decide(wf, "lead_shrinking", f"{exp_id} [{cohort}]: {winner}'s lead fell from "
+                                  f"{ref_up:+.1%} to {cur_up:+.1%}; still ahead, keeping it", {"z": round(z_up, 2)}, db=db)
             return []
         info = {"cohort": cohort, "window_h": DECAY_WINDOW_H, "winner_recent": [ws, wn], "holdout_recent": [hs, hn],
                 "winner_at_promotion": [ref_s, ref_n], "uplift_then": round(ref_up, 4), "uplift_now": round(cur_up, 4),
@@ -835,8 +849,8 @@ class Brain:
         for i in intents:
             for c in i.get("new_cohorts", []):
                 if c["id"] not in {x["id"] for x in new["cohorts"]} and len(new["cohorts"]) < 20:
-                    # new cohorts go first so a narrow segment isn't swallowed by an earlier broad one
-                    new["cohorts"].insert(0, {"id": c["id"], "where": c["where"]})
+                    # appended: leads already in an earlier cohort stay there (segment tests only use default-cohort calls)
+                    new["cohorts"].append({"id": c["id"], "where": c["where"]})
             for k, dims in (i.get("alloc") or {}).items():
                 for dim, d in dims.items():
                     new["allocations"].setdefault(k, {})[dim] = dict(d)

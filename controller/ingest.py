@@ -78,12 +78,12 @@ class Ingestor:
                 keys.append(f"caller_id={var['caller_id']}|cohort={cid}")
                 for dim in EXP_DIMS:
                     keys.append(f"{dim}={var[dim]}|cohort={cid}")
-                    if seg:
+                    if seg and cid == "default":   # segment slices only for the default cohort: no contamination
                         for f, v in zip(FEATURES, seg):
                             keys.append(f"{dim}={var[dim]}|{f}={v}")
                 if seg:
                     for f, v in zip(FEATURES, seg):
-                        keys.append(f"seg:{f}={v}")
+                        keys.append(f"seg:{f}={v}")   # all cohorts: used for sizing cohorts
                 for k in keys:
                     a = agg[(wf, d, h, k)]
                     a[0] += inc[0]; a[1] += inc[1]; a[2] += inc[2]; a[3] += inc[3]

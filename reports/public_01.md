@@ -4,35 +4,35 @@
 
 | workflow | conclusion rate | Δ | pickup | Δ | engagement | Δ | engagement gap captured | hallucinated calls (base) |
 |---|---|---|---|---|---|---|---|---|
-| ks_cancel | 0.347 | +1.5% | 0.243 | +1.5% | 0.501 | +0.3% | 8% | 58 (52) |
-| nw_kyc | 0.431 | +14.6% | 0.281 | +16.1% | 0.596 | -2.7% | 0% | 23 (21) |
-| nw_renewal | 0.423 | +0.7% | 0.261 | -0.5% | 0.556 | +1.6% | 11% | 50 (39) |
-| ALL | 0.390 | +4.0% | 0.257 | +3.5% | 0.541 | +0.4% | 7% | 131 (112) |
+| ks_cancel | 0.348 | +1.8% | 0.241 | +0.5% | 0.506 | +1.3% | 2% | 66 (52) |
+| nw_kyc | 0.452 | +19.9% | 0.291 | +20.1% | 0.596 | -2.6% | 0% | 25 (21) |
+| nw_renewal | 0.409 | -2.6% | 0.257 | -2.0% | 0.547 | -0.1% | 1% | 51 (39) |
+| ALL | 0.390 | +4.0% | 0.256 | +3.3% | 0.540 | +0.3% | 1% | 142 (112) |
 
 ## Changes applied by the controller
 
-7 applied — neutral: 2, beneficial: 5
+7 applied — beneficial: 4, neutral: 3
 
+- nw_renewal v2 (controller_approved) dims=['welcome_message', 'voice'] engageΔ=+0.031 didΔ=+0.000 → **beneficial**
 - ks_cancel v2 (controller_approved) dims=['welcome_message', 'voice'] engageΔ=-0.002 didΔ=+0.000 → **neutral**
-- nw_renewal v2 (controller_approved) dims=['welcome_message', 'voice'] engageΔ=+0.030 didΔ=+0.000 → **beneficial**
-- nw_kyc v2 (controller_approved) dims=['caller_id'] engageΔ=+0.000 didΔ=+0.337 → **beneficial**
-- nw_kyc v3 (controller_approved) dims=['caller_id'] engageΔ=+0.000 didΔ=+0.001 → **neutral**
-- nw_renewal v3 (controller_approved) dims=['cohorts', 'welcome_message'] engageΔ=+0.012 didΔ=+0.000 → **beneficial**
-- ks_cancel v3 (controller_approved) dims=['voice'] engageΔ=+0.064 didΔ=+0.000 → **beneficial**
-- ks_cancel v4 (controller_approved) dims=['welcome_message'] engageΔ=+0.016 didΔ=+0.000 → **beneficial**
+- nw_kyc v2 (controller_approved) dims=['caller_id'] engageΔ=+0.000 didΔ=+0.154 → **beneficial**
+- nw_kyc v3 (controller_approved) dims=['caller_id'] engageΔ=+0.000 didΔ=+0.193 → **beneficial**
+- nw_renewal v3 (controller_approved) dims=['cohorts', 'welcome_message'] engageΔ=+0.005 didΔ=+0.000 → **neutral**
+- ks_cancel v3 (controller_approved) dims=['welcome_message'] engageΔ=+0.016 didΔ=+0.000 → **beneficial**
+- nw_kyc v4 (controller_approved) dims=['caller_id'] engageΔ=+0.000 didΔ=-0.001 → **neutral**
 
 ## Governance
 
 ```
 {
-  "approval_requests": 10,
+  "approval_requests": 11,
   "decisions": {
     "approved": 7,
-    "rejected": 3,
+    "rejected": 4,
     "expired": 0
   },
   "rejection_reasons": {
-    "approver declined (judgement call)": 3
+    "approver declined (judgement call)": 4
   },
   "applied_via_approval": 7,
   "auto_applied": 0,
@@ -41,7 +41,7 @@
   "lapsed": 0,
   "peak_requests_per_24h": {
     "nw_renewal": 1,
-    "nw_kyc": 2,
+    "nw_kyc": 1,
     "ks_cancel": 1
   }
 }
@@ -58,10 +58,11 @@
 ```
 {
   "nw_renewal:welcome_message=W3": {
-    "4": 0.153,
-    "5": 0.108,
-    "6": 0.086,
-    "7": 0.091
+    "3": 0.155,
+    "4": 0.357,
+    "5": 0.482,
+    "6": 0.488,
+    "7": 0.489
   }
 }
 ```
