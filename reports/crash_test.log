@@ -1,44 +1,44 @@
-2026-11-06 10:55:57,692 caught up: 187292 events in 2.4s
-=== kill -9 #1 after 2.5s at 2027-01-04T00:00:00+05:30
-2026-11-06 10:55:57,841 resuming from state/crash02.db at D0 00:00
-2026-11-06 10:55:57,884 caught up: 0 events in 0.0s
-2026-11-06 10:55:57,916 D0 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=8 wall=0s
-2026-11-06 10:55:59,735 D1 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=17 wall=2s
-=== kill -9 #2 after 2.9s at 2027-01-05T14:00:00+05:30
-2026-11-06 10:56:00,795 resuming from state/crash02.db at D1 14:00
-2026-11-06 10:56:00,858 caught up: 0 events in 0.0s
-2026-11-06 10:56:01,607 D2 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=22 wall=1s
-2026-11-06 10:56:03,314 D3 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=35 wall=2s
-=== kill -9 #3 after 3.3s at 2027-01-07T10:00:00+05:30
-2026-11-06 10:56:04,157 resuming from state/crash02.db at D3 10:00
-2026-11-06 10:56:04,237 caught up: 0 events in 0.0s
-2026-11-06 10:56:05,530 D4 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=56 wall=1s
-=== kill -9 #4 after 3.4s at 2027-01-08T21:30:00+05:30
-2026-11-06 10:56:07,551 resuming from state/crash02.db at D4 21:30
-2026-11-06 10:56:07,611 caught up: 0 events in 0.0s
-2026-11-06 10:56:07,776 D5 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=67 wall=0s
-2026-11-06 10:56:09,740 D6 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=76 wall=2s
-=== kill -9 #5 after 4.0s at 2027-01-10T19:00:00+05:30
-2026-11-06 10:56:11,617 resuming from state/crash02.db at D6 19:00
-2026-11-06 10:56:11,695 caught up: 0 events in 0.0s
-2026-11-06 10:56:12,119 D7 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=85 wall=0s
-2026-11-06 10:56:14,276 D8 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=95 wall=3s
-=== kill -9 #6 after 3.8s at 2027-01-12T12:30:00+05:30
+2026-11-06 11:06:23,112 caught up: 187292 events in 2.7s
+2026-11-06 11:06:23,171 D0 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=8 wall=0s
+=== kill -9 #1 after 3.9s at 2027-01-04T11:00:00+05:30
+2026-11-06 11:06:24,217 resuming from state/crash02.db at D0 11:00
+2026-11-06 11:06:24,284 caught up: 0 events in 0.0s
+2026-11-06 11:06:25,569 D1 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=16 wall=1s
+=== kill -9 #2 after 1.5s at 2027-01-05T00:30:00+05:30
+2026-11-06 11:06:25,782 resuming from state/crash02.db at D1 00:00
+2026-11-06 11:06:25,846 caught up: 0 events in 0.0s
+=== kill -9 #3 after 1.8s at 2027-01-05T18:30:00+05:30
+2026-11-06 11:06:27,786 resuming from state/crash02.db at D1 18:30
+2026-11-06 11:06:27,833 caught up: 0 events in 0.0s
+2026-11-06 11:06:28,253 D2 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=23 wall=0s
+2026-11-06 11:06:30,327 D3 00:00 events=0 ingest=0.0s decide=0.0s credits=200 pending=0 decisions=32 wall=2s
+=== kill -9 #4 after 3.4s at 2027-01-07T09:30:00+05:30
+2026-11-06 11:06:31,234 resuming from state/crash02.db at D3 09:30
+2026-11-06 11:06:31,304 caught up: 350 events in 0.0s
+2026-11-06 11:06:32,925 D4 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=44 wall=2s
+=== kill -9 #5 after 3.8s at 2027-01-08T21:00:00+05:30
+2026-11-06 11:06:35,061 resuming from state/crash02.db at D4 20:30
+2026-11-06 11:06:35,123 caught up: 350 events in 0.0s
+2026-11-06 11:06:35,331 D5 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=57 wall=0s
+=== kill -9 #6 after 2.4s at 2027-01-09T21:00:00+05:30
 === final restart, run to completion
-2026-11-06 10:56:15,471 resuming from state/crash02.db at D8 12:30
-2026-11-06 10:56:15,573 caught up: 450 events in 0.0s
-2026-11-06 10:56:16,812 D9 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=102 wall=1s
-2026-11-06 10:56:18,990 D10 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=107 wall=3s
-2026-11-06 10:56:18,990 scenario finished at D10 00:00; wall 3s
+2026-11-06 11:06:37,492 resuming from state/crash02.db at D5 21:00
+2026-11-06 11:06:37,568 caught up: 350 events in 0.0s
+2026-11-06 11:06:37,808 D6 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=68 wall=0s
+2026-11-06 11:06:40,064 D7 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=76 wall=2s
+2026-11-06 11:06:42,421 D8 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=85 wall=5s
+2026-11-06 11:06:44,933 D9 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=92 wall=7s
+2026-11-06 11:06:47,460 D10 00:00 events=0 ingest=0.0s decide=0.0s credits=197 pending=0 decisions=97 wall=10s
+2026-11-06 11:06:47,460 scenario finished at D10 00:00; wall 10s
 === exit code 0
 calls nw_renewal: simulator=84795 controller=84795 OK
 calls ks_cancel: simulator=113056 controller=113056 OK
 calls nw_kyc: simulator=47199 controller=47199 OK
-approvals nw_renewal: 6 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
-approvals nw_kyc: 3 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
-approvals ks_cancel: 4 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=['apr_00006'], store disagrees=[] OK
+approvals nw_renewal: 4 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
+approvals nw_kyc: 5 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
+approvals ks_cancel: 2 total, applied twice=[], approved-but-unapplied=[], lapsed=[], refused-as-stale=[], store disagrees=[] OK
 CONSISTENT
-| ALL | 0.390 | +16.3% | 0.250 | +11.9% | 0.543 | +2.5% | 21% | 184 (406) |
-20 applied — beneficial: 16, neutral: 3, harmful: 1
+| ALL | 0.389 | +15.8% | 0.248 | +11.0% | 0.545 | +2.7% | 22% | 161 (406) |
+18 applied — beneficial: 15, neutral: 3
   "apply_conflicts": 0,
   "lapsed": 0,

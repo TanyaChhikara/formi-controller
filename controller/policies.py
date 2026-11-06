@@ -715,12 +715,20 @@ class Brain:
     def _decay_watch(self, wf, w, exp_id, cohort, dim, control, winner, notes):
         metric = metric_of(w)
         h1 = self.now_h()
-        h0 = h1 - DECAY_WINDOW_H
-        if h0 < notes.get("promo_h", h0 + 1):    # need a full window after promotion
+        promo_h = notes.get("promo_h", h1)
+        # 24h window; widen to 48h when the holdout is too thin in a day (low pickup → few connected calls)
+        if h1 - DECAY_WINDOW_H < promo_h:    # need one full window after promotion
             return []
-        r = self._arm_stats(wf, dim, [winner, control], h0, h1, cohort)
-        ws, wn = sn(r[winner], metric)
-        hs, hn = sn(r[control], metric)
+        for win_h in (DECAY_WINDOW_H, 2 * DECAY_WINDOW_H):
+            h0 = h1 - win_h
+            if h0 < promo_h:    # 48h not available yet: stay with the 24h numbers
+                win_h = DECAY_WINDOW_H
+                break
+            r = self._arm_stats(wf, dim, [winner, control], h0, h1, cohort)
+            ws, wn = sn(r[winner], metric)
+            hs, hn = sn(r[control], metric)
+            if hn >= 150:
+                break
         ref_s, ref_n = notes.get("ref_s", 0), notes.get("ref_n", 0)
         ref_cs, ref_cn = notes.get("ref_cs", 0), notes.get("ref_cn", 0)
         if wn < 300 or hn < 150 or ref_n == 0:
@@ -745,12 +753,14 @@ class Brain:
         decayed = streak["n"] >= 2
         if not decayed:
             if z_up < -2.58 and not self.s.get(f"shrink_logged:{exp_id}"):
+                note = ("still ahead, keeping it" if cur_up > 0 else
+                        "no longer ahead; rolling back if the next 6-hourly check agrees")
                 with self.s.tx() as db:
                     self.s.put(f"shrink_logged:{exp_id}", True, db)
                     self.s.decide(wf, "lead_shrinking", f"{exp_id} [{cohort}]: {winner}'s lead fell from "
-                                  f"{ref_up:+.1%} to {cur_up:+.1%}; still ahead, keeping it", {"z": round(z_up, 2)}, db=db)
+                                  f"{ref_up:+.1%} to {cur_up:+.1%}; {note}", {"z": round(z_up, 2)}, db=db)
             return []
-        info = {"cohort": cohort, "window_h": DECAY_WINDOW_H, "winner_recent": [ws, wn], "holdout_recent": [hs, hn],
+        info = {"cohort": cohort, "window_h": win_h, "winner_recent": [ws, wn], "holdout_recent": [hs, hn],
                 "winner_at_promotion": [ref_s, ref_n], "uplift_then": round(ref_up, 4), "uplift_now": round(cur_up, 4),
                 "z_uplift_drop": round(z_up, 2), "z_vs_holdout": round(z_hold, 2), "z_self": round(z_self, 2)}
         if not self.s.get(f"decay_logged:{exp_id}"):
@@ -761,7 +771,7 @@ class Brain:
             "key": f"exp_rollback:{exp_id}", "kind": "exp_rollback", "exp_id": exp_id, "winner": winner,
             "dim": dim, "urgent": True, "operational": dim == "caller_id", "alloc": {cohort: {dim: {control: 1.0}}},
             "summary": f"Roll back {dim} {winner} → {control} for {cohort}: its advantage has faded",
-            "rationale": (f"Last {DECAY_WINDOW_H}h: {winner} {rate(ws, wn):.1%} (n={wn}) vs holdout {control} "
+            "rationale": (f"Last {win_h}h: {winner} {rate(ws, wn):.1%} (n={wn}) vs holdout {control} "
                           f"{rate(hs, hn):.1%} (n={hn}); its lead went from {ref_up:+.1%} to {cur_up:+.1%} "
                           f"(z={z_up:.1f})."),
             "impact": min(1.0, max(0.1, (ref_up - cur_up) / max(rate(hs, hn), 1e-6) / 0.10)), "dry_run": info,
