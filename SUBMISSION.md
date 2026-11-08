@@ -264,6 +264,7 @@ Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_can
 ## 13. Known weaknesses
 - **Rollback is slow, and none completed in the final runs.** It's strict on purpose: the eager version caused harmful rollbacks. In public_01, W3's lead fell to −9.1% on D6 and the rollback was waiting for its second check when the run ended (renewal finished −2.4%). In public_02 the fading W3 was pruned before it could be promoted. Next: a CUSUM on the lead, or a larger holdout just after promotion.
 - **The LLM step of C8 isn't exercised in the final runs** (0 calls). Reverting to a prompt that already ran safely was always possible and cheaper. The LLM path ran only in an earlier version (it suggested P3, which passed validation and was applied).
+- **Results vary slightly across machines.** Same machine and Python version: identical every run. On a Mac with Python 3.12, public_01 gave +5.2% and 8 changes (vs +5.4% and 7 here), still 0 harmful.
 - **Crash runs are consistent but not bit-identical** to an uninterrupted run (+15.8% vs +16.2% on public_02). Decisions match up to D3; I didn't find the source in time. All correctness checks pass.
 - **Caller-ID quarantine is permanent**, and new numbers are only explored on pickup-primary workflows. A workflow can run out of numbers; that should page.
 - **No workflow-level KPI-drift alarm.** We detect three causes (bad number, hallucinating prompt, fading winner); a drop with another cause is only visible in `audit health`.
