@@ -8,7 +8,10 @@ KILLS=${1:-5}; PORT=8710; URL=http://127.0.0.1:$PORT
 LOG=reports/crash_test.log; : > $LOG
 python -m sim serve --scenario scenarios/public_02_incidents.yaml --run-dir runs/crash02 --force --port $PORT > /tmp/sim_crash.log 2>&1 &
 SIM=$!; trap 'kill $SIM 2>/dev/null' EXIT
-until grep -q ready /tmp/sim_crash.log; do sleep 1; done
+until grep -q ready /tmp/sim_crash.log; do
+  kill -0 $SIM 2>/dev/null || { echo "simulator failed to start:"; cat /tmp/sim_crash.log; exit 1; }
+  sleep 1
+done
 export CONTROLLER_DB=state/crash02.db; rm -f $CONTROLLER_DB*
 for i in $(seq 1 "$KILLS"); do
   python -m controller.main --url $URL >> $LOG 2>&1 &

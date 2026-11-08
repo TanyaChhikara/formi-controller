@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import time
 from contextlib import contextmanager
 
 SCHEMA = """
@@ -112,6 +111,3 @@ class Store:
         self.db.execute(f"INSERT OR REPLACE INTO metrics ({cols}) VALUES ({','.join('?' * len(kw))})",
                         tuple(kw.values()))
 
-
-def now_wall():
-    return time.time()

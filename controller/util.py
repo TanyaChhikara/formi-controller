@@ -11,12 +11,13 @@ def fmt_minute(m: int) -> str:
     return f"D{d} {r // 60:02d}:{r % 60:02d}"
 
 
+def set_origin(ts: str, sim_minute: int) -> None:
+    """Derive D0 from the simulator itself (its ts minus its sim_minute), so a scenario with another start
+    date can't silently shift every time window."""
+    global D0
+    D0 = datetime.fromisoformat(ts) - timedelta(minutes=int(sim_minute))
+
+
 def ts_to_minute(ts: str) -> int:
     return int((datetime.fromisoformat(ts) - D0).total_seconds() // 60)
 
-
-def day_hour(ts: str):
-    """ISO ts -> (sim day, hour). Cheap path: parse the fixed-format string ourselves (hot loop)."""
-    m = ts_to_minute(ts)
-    d, r = divmod(m, DAY)
-    return d, r // 60

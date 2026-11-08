@@ -1,13 +1,13 @@
 # Outcome-First Agent Loop — Submission
 
-**Name:** Tanya · **Date:** 2026-11-07 · **Hours actually spent:** 7 hours, AI-assisted (every line reviewed) · **Language / storage:** Python 3.11+, httpx, SQLite (WAL, one file)
+**Name:** Tanya · **Date:** 2026-11-09 · **Hours actually spent:** 7 hours, AI-assisted (every line reviewed) · **Language / storage:** Python 3.10+ (no Docker), httpx, SQLite (WAL, one file)
 
 ---
 
 ## 0. TL;DR
 - One process: event chunks → counters in SQLite → four state-driven policies (supervisor edits, hallucination, caller-ID health, experiments) → one governance client that every change goes through.
 - **Five capabilities done deeply** (C6+C7 experiment lifecycle, C8, C5, C2) on top of the **four the constraints force** (C1, C9, C12, C13, built as one crash-safe design). C3, C10, C11, C14 are thin by-products. **C4 and C15 are cut**, with numbers (§2).
-- **public_01: +5.4% leads concluded, 7 changes, 0 harmful. public_02: +16.2%, 18 changes, 0 harmful, bad prompt detected in 1h and fixed in 180 min for 3 credits. public_03 (load): +16.3%, 37 changes, 0 harmful, ~24 s wall per simulated day.**
+- **public_01: +5.4% leads concluded, 7 changes, 0 harmful. public_02: +15.8%, 18 changes, 0 harmful, bad prompt detected in 1h and fixed in 180 min for 3 credits. public_03 (load): +16.3%, 37 changes, 0 harmful, ~25 s wall per simulated day.**
 - Crash test: 6–8 random `kill -9`s; every event counted once, nothing applied twice, nothing lost or lapsed.
 - Biggest known weakness: rollback of a fading winner is deliberately slow (§13).
 
@@ -85,7 +85,7 @@ C1 and C13 are one mechanism: each chunk's counters commit in the same transacti
 ### 03 — Kabir Menon, Platform & SRE
 - **Accepted:** kill/restart test (`scripts/crash_test.sh`, §9). Idempotency everywhere (§9). Paging rules (§10). No new stateful infra: SQLite is a file inside the process, not a service. Loop health without logs (`audit health`).
 - **Pushed back:** none. "No new stateful infra" is honoured, with the caveat that SQLite is single-writer. The production move is Postgres (same schema, same transactions).
-- **Reply:** "Kabir, it's one Python process and one SQLite file in WAL mode: nothing new to run at 2 a.m. Every chunk is committed with its cursor in one transaction, and every proposal is written before it's sent, then reconciled against the simulator by ID on restart. The crash test kills it 6–8 times at random; events match the simulator exactly and nothing is applied twice. Load scenario: about 24 s wall per simulated day on a 2-vCPU box (target 10 min), 72k events/s, <1 GB RSS. What breaks first at 10× is the in-memory lead cache. Fix and sharding plan are in §8."
+- **Reply:** "Kabir, it's one Python process and one SQLite file in WAL mode: nothing new to run at 2 a.m. Every chunk is committed with its cursor in one transaction, and every proposal is written before it's sent, then reconciled against the simulator by ID on restart. The crash test kills it 6–8 times at random; events match the simulator exactly and nothing is applied twice. Load scenario: about 25 s wall per simulated day on a 2-vCPU box (target 10 min), ~65k events/s, ~1 GB peak memory. What breaks first at 10× is the in-memory lead cache. Fix and sharding plan are in §8."
 
 ### 04 — Anita Desai, Kestrel Ops Supervisor
 - **Accepted:** your edits are never undone. A supervisor edit closes our experiment on that dimension, and we wait a day before testing it again. At most 2 routine requests a day, none before 11:00, one batched request per workflow. Customer-facing changes go to approval even though your policy would let us auto-apply them. One screen: `audit view`. Validation is treated as safety-only, and engagement is checked after every prompt fix (your "verbatim script" warning).
@@ -144,7 +144,7 @@ Each tick: ingest new chunks → refresh configs → handle supervisor edits →
 
   Losers (worse overall, or worse in the last 48h) are pruned. If every challenger loses, the test closes. With no winner it keeps running: "close after N days" was removed because snapping back to a worse control was itself harmful.
 - **False-winner rate.** ≈5% family-wise per test with ≤5 looks; the guards push it lower at the cost of about a day's delay. Sample sizes at a 55% base: +10% relative needs 1,265 per arm, +15% needs 557, +5% needs 5,104 (`stats.n_per_arm`).
-- **Decay and rollback.** On promotion, 15% stays on the old control as a **holdout**. Decay = the winner's lead over the holdout (same hours, so general drift cancels out) has dropped significantly (z<−3.0) or the winner is now behind (z<−2.58), *and* the lead is ≤0. It's checked every 6h and must hold on **two consecutive checks**. The window is 24h, widened to 48h if the holdout has <150 connected calls. Earlier versions compared the winner to its own past and fired on a workflow-wide dip; that was the main source of harmful rollbacks. A fading arm *before* promotion is caught by the 48h loser test. That's how the decaying W3 was removed in public_02 (D7: z=−2.59 over 48h while level overall).
+- **Decay and rollback.** On promotion, 15% stays on the old control as a **holdout**. Decay = the winner's lead over the holdout (same hours, so general drift cancels out) has dropped significantly (z<−3.0) or the winner is now behind (z<−2.58), *and* the lead is ≤0. It's checked every 6h and must hold on **two consecutive checks**. The window is 24h, widened to 48h if the holdout has <150 connected calls. Earlier versions compared the winner to its own past and fired on a workflow-wide dip; that was the main source of harmful rollbacks. A fading arm *before* promotion is caught by the 48h loser test. That's how the decaying W3 was removed in public_02 (D6: z=−2.71 over 48h while level overall).
 - **Call time and caller ID.**
   - Call time: cut, with the measured ceiling (§2).
   - Caller ID: per-number pickup over 3h vs pooled peers (z≤−3.5, <70% of peers, ≥120 dials), or vs its own history when it's the only number. Quarantined numbers are removed, auto-applied where policy allows in `max_shift` steps.
@@ -162,20 +162,20 @@ Each tick: ingest new chunks → refresh configs → handle supervisor edits →
 - **Detection:** hallucination flags on connected calls since the current prompt went live, over the last 6h. Fires if rate ≥3× the history baseline, ≥120 connected, and Poisson tail p ≤ 1e−7 (≤1e−4 within 12h of a prompt change, since a change is a strong prior). The first version used a normal-approximation z≥4. It fired a false incident on KYC, which is why I switched to an exact tail with a much smaller p. With ~1,500 overlapping checks per run, p=1e−7 keeps the expected false alarms well under 1.
 - **Picking a fix:** first, a prompt we've run with a normal rate (≥1,000 connected) → validate it (n=300, 3 credits). Otherwise one LLM call (3 credits) → validate the candidates in order. Caps: 15 credits per incident, never below a 10-credit floor.
 - **Verify:** after apply, ≥200 connected on the new prompt; check the hallucination rate is back near baseline and engagement isn't below baseline (z>−3), because validation says nothing about engagement.
-- **public_02 timeline (ks_cancel):** D3 12:00 supervisor ships P2 (`supervisor_edit` logged, not reverted) → **D3 13:00 incident opened** (11/158 = 7.0% vs 1.5%, p=3.2e−5) → P1 validated 98.7% (3 credits) → proposal sent D3 13:00 → approved and applied **D3 14:30** → verified D3 18:00. Grader MTTR: 180 min. Credits: 3 of 200. Caller ID: D2 flagged D2 12:00 and auto-rotated in 3 steps (max_shift 0.2); grader share 14% on the flag day, then 0%.
+- **public_02 timeline (ks_cancel):** D3 12:00 supervisor ships P2 (`supervisor_edit` logged, not reverted) → **D3 13:00 incident opened** (13/167 = 7.8% vs 1.5%, p=1.9e−6) → P1 validated 98.7% (3 credits) → proposal sent D3 13:00 → approved and applied **D3 14:30** → verified D3 18:00. Grader MTTR: 180 min. Credits: 3 of 200. Caller ID: D2 flagged D2 12:00 and auto-rotated in 3 steps (max_shift 0.2); grader share 14% on the flag day, then 0%.
 
 ## 8. Scale
 Measured on public_03_load with a 2-vCPU / 7.7 GB sandbox (smaller than the target box). The scenario matches the production target: **6.48 lakh dials/day and a 54,000-dial peak hour** (target: ~6.5 lakh/day, >50k/hour), 12 workflows.
 
 | Metric | Measured | Note |
 |---|---|---|
-| Ingest throughput | **~70k events/s** steady, 76k/s on the 5.5M-event history catch-up | |
-| Real arrival rate at peak | ~15–20 events/s (54k dials/hour) | ~3,500× headroom |
-| Time per tick (ingest + decide) | avg **0.57 s**, max **1.66 s** (a 192k-event chunk) | |
-| Decide time | avg **0.10 s** per tick for 12 workflows (~8 ms per workflow) | |
+| Ingest throughput | **~65–70k events/s** steady; 5.54M-event history catch-up in 82 s (~67k/s) | |
+| Real arrival rate at peak | ~15–20 events/s (54k dials/hour) | ~3,000× headroom |
+| Time per tick (ingest + decide) | avg **0.59 s**, max **1.66 s** (a 192k-event chunk) | |
+| Decide time | avg **0.09 s** per tick for 12 workflows (~8 ms per workflow) | |
 | Decision lag | ≤ **30 sim-min + ~1 s**: an event affects decisions at the next tick | Tick size is our choice (min 15) |
-| Wall time per simulated day | **~24 s** (≈7 s of it is the simulator itself) | Target: 10 min |
-| Peak memory | **990 MB**, growing ~54 MB per sim-day | Almost all of it is the lead cache (2.3M leads) |
+| Wall time per simulated day | **~25 s** (≈7 s of it is the simulator itself) | Target: 10 min |
+| Peak memory | **~1.0 GB** (1,042 MB), growing ~54 MB per sim-day | Almost all of it is the lead cache (2.3M leads) |
 | Store | 200 MB, 110k counter rows (19 days incl. history) | Counters, not raw events |
 
 (`reports/public_03_loop_health.txt`, `reports/public_03.md`)
@@ -188,7 +188,7 @@ Measured on public_03_load with a 2-vCPU / 7.7 GB sandbox (smaller than the targ
 3. **One serial loop.** ~8 ms + ~3 API calls per workflow per tick: 500 workflows ≈ 4 s and 1,500 calls per tick. That fits a 30-min tick but not a 1–5 min safety cadence, and one crash pauses everyone.
 4. **SQLite's single writer**, only if you skip the next step.
 
-**Not a problem at 10×:** ingest (200 vs 70,000 events/s); governance (limits are per workflow); statistics (10× the calls means tests finish ~10× sooner).
+**Not a problem at 10×:** ingest (~200 vs ~65,000 events/s); governance (limits are per workflow); statistics (10× the calls means tests finish ~10× sooner).
 
 **Partitioning.** Shard by tenant. Tenants share nothing: own policy, objective, approver and limits.
 - Each shard is owned by one worker holding a lease, so only one writer exists per workflow.
@@ -198,7 +198,7 @@ Measured on public_03_load with a 2-vCPU / 7.7 GB sandbox (smaller than the targ
 
 ## 9. Reliability
 - **Method:** `scripts/crash_test.sh 8` runs public_02, `kill -9`s the controller 6–8 times at random wall-times (including during history catch-up and during approver hours), restarts it each time, then `scripts/check_consistency.py` compares the store with the API.
-- **Result** (`reports/crash_test.log`): calls per workflow equal the simulator exactly (84,795 / 113,056 / 47,199). No approval applied twice, none approved-but-forgotten, none lapsed. Store status matches the simulator for every approval. Graded run: +15.8%, 18 changes, 0 harmful. **State lost:** none. Known gap: if killed between a validation call and saving its result, the validation is repeated (≤3 credits).
+- **Result** (`reports/crash_test.log`): calls per workflow equal the simulator exactly (84,795 / 113,056 / 47,199). No approval applied twice, none approved-but-forgotten, none lapsed. Store status matches the simulator for every approval. Graded crash run (`reports/crash_public_02.md`): +14.0%, 24 changes, **0 harmful**, 0 lapsed, 0 apply conflicts. **State lost:** none. Known gap: if killed between a validation call and saving its result, the validation is repeated (≤3 credits).
 - **Idempotency keys:** chunk number (cursor in the same transaction). `proposal_id` is deterministic (`prefix-wf-simminute-hash(intent keys)`), written as `intent` before the call. On restart at the same sim minute the identical request is resent with the same ID; if time has moved on it's dropped and re-planned. `approval_id` is reconciled via `GET /approvals`. Apply is guarded by checking the simulator's status (`applied`) and `config/history`. On-applied callbacks are idempotent (`UPDATE … WHERE status='planned'`).
 - **Simulator errors:** transport errors and 5xx are retried with backoff (8 attempts). 4xx is information: 409 stale → mark stale and re-plan, 409 duplicate → reconcile, 410 → lapsed, 403 auto → recorded, 402 → credit floor stops spending first.
 
@@ -207,16 +207,15 @@ Measured on public_03_load with a 2-vCPU / 7.7 GB sandbox (smaller than the targ
 ```
 ks_cancel at D3 16:00 was running config v7, applied D3 14:30 by controller_approved; changed ["prompt_version"]
   proposal prop-ks_cancel-5100-9ea59a35 (approval), created D3 13:00: Fix hallucination incident: switch prompt P2 → P1
-  why: Hallucination flags on P2 are 7.0% of connected calls vs a 1.5% baseline (z=5.7, n=158). P1 passed
-       validation at 98.7% (n=300). We will check engagement after the switch, since validation measures safety only.
+  why: Hallucination flags on P2 are 7.8% of connected calls vs a 1.5% baseline (z=6.8, n=167). P1 passed validation at 98.7% (n=300). We will check engagement after the switch, since validation measures safety only.
   evidence: {"validation_run_id": "val_00001"}  impact_score=1.0 affected_leads=1500
     D3 13:00  proposal_sent      Fix hallucination incident: switch prompt P2 → P1
     D3 14:30  approval_approved  apr_00005 approved
     D3 14:30  applied            config v7 applied (approval)
   approved by: the ks_cancel client approver via apr_00005 (simulated human; the API gives no name)
-  before (24h): {'dials': 4800, 'pickup': 0.2288, 'engagement': 0.4627, 'halluc_rate': 0.0264}
-  after  (24h): {'dials': 4800, 'pickup': 0.214, 'engagement': 0.5005, 'halluc_rate': 0.0185}
-  next change: v8 by controller_auto at D4 17:00 ["caller_id"]
+  before (24h): {'dials': 4800, 'pickup': 0.225, 'engagement': 0.4676, 'halluc_rate': 0.0231}
+  after  (24h): {'dials': 4800, 'pickup': 0.2042, 'engagement': 0.5153, 'halluc_rate': 0.0163}
+  next change: v8 by controller_auto at D4 16:30 ["caller_id"]
 ```
 Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_cancel.json`), `audit health` (per-day events, ingest rate, decide time, decisions, credits, RSS), `audit log --kind did_flagged`.
 
@@ -239,7 +238,7 @@ Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_can
 | ks_cancel | 0.320 | +31.3% | 0.221 | +20.8% | 0.498 | +5.6% |
 | nw_kyc | 0.466 | +21.3% | 0.285 | +15.0% | 0.618 | +3.0% |
 | nw_renewal | 0.433 | +0.8% | 0.263 | −0.1% | 0.552 | +0.9% |
-| ALL | 0.390 | +16.2% | 0.248 | +11.2% | 0.545 | +2.9% |
+| ALL | 0.389 | +15.8% | 0.248 | +11.0% | 0.545 | +2.7% |
 18 applied: 15 beneficial, 3 neutral, **0 harmful**. 0 lapsed/expired/conflicts. 3 credits.
 
 **public_03:** +16.3% conclusion overall, 37 applied (29 beneficial, 8 neutral, 0 harmful).
@@ -247,7 +246,7 @@ Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_can
 **Interpretation.**
 - KYC gains come from caller-ID work. Spreading load off a single, degrading number is the biggest single lever in these worlds.
 - The Kestrel cancel line in public_02 gains from the fast prompt fix plus caller-ID rotation.
-- **Where I'm weak:** renewal in public_01 (−2.4% outcome). W3 won early, was promoted on D4, then faded. My conservative decay rule (two consecutive 6-hourly checks, thin holdout) hadn't rolled it back by D8. On public_02 the same rule did remove W3 by D7. The KYC engagement guardrail moved −3.2% relative in public_01, which is about −1.9 points absolute: inside `engagement_rate_max_drop: 0.02` if that is absolute (my assumption), a breach if it is relative. It comes from the pickup gain (more marginal people now pick up), not from any change to what they hear.
+- **Where I'm weak:** renewal in public_01 (−2.4% outcome). W3 won early, was promoted on D4, then faded. My conservative decay rule (two consecutive 6-hourly checks, thin holdout) hadn't rolled it back by D8. On public_02 the same rule removed W3 on D6. The KYC engagement guardrail moved −3.2% relative in public_01, which is about −1.9 points absolute: inside `engagement_rate_max_drop: 0.02` if that is absolute (my assumption), a breach if it is relative. It comes from the pickup gain (more marginal people now pick up), not from any change to what they hear.
 - **Earlier versions were harmful** (up to 6 harmful changes on load). Causes, all fixed and committed: rollback on a shrinking-but-positive lead; self-comparison confounded by drift; segment stats contaminated by existing cohorts; re-testing retired losers; closing tests back to a worse control.
 
 ## 12. Trade-offs & rejected alternatives
@@ -264,14 +263,13 @@ Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_can
 ## 13. Known weaknesses
 - **Rollback is slow, and none completed in the final runs.** It's strict on purpose: the eager version caused harmful rollbacks. In public_01, W3's lead fell to −9.1% on D6 and the rollback was waiting for its second check when the run ended (renewal finished −2.4%). In public_02 the fading W3 was pruned before it could be promoted. Next: a CUSUM on the lead, or a larger holdout just after promotion.
 - **The LLM step of C8 isn't exercised in the final runs** (0 calls). Reverting to a prompt that already ran safely was always possible and cheaper. The LLM path ran only in an earlier version (it suggested P3, which passed validation and was applied).
+- **Crash runs are consistent but not bit-identical** to an uninterrupted run (+14.0% vs +15.8% on public_02, both 0 harmful). Every correctness check passes; a restart lands decisions on slightly different ticks and the run drifts from there. I didn't fully trace it.
 - **Results vary slightly across machines.** Same machine and Python version: identical every run. On a Mac with Python 3.12, public_01 gave +5.2% and 8 changes (vs +5.4% and 7 here), still 0 harmful.
-- **Crash runs are consistent but not bit-identical** to an uninterrupted run (+15.8% vs +16.2% on public_02). Decisions match up to D3; I didn't find the source in time. All correctness checks pass.
 - **Caller-ID quarantine is permanent**, and new numbers are only explored on pickup-primary workflows. A workflow can run out of numbers; that should page.
 - **No workflow-level KPI-drift alarm.** We detect three causes (bad number, hallucinating prompt, fading winner); a drop with another cause is only visible in `audit health`.
 - Segments are single-feature, max 4 per workflow; welcome × voice interactions aren't tested.
 - The dry run replays our own counters; it isn't a counterfactual simulation.
 - The lead cache grows without limit and counter queries don't use a proper index: fine for the scenarios, not for weeks of production (§8).
-- Dead code to remove: `util.day_hour`, `store.now_wall`.
 
 ## 14. If this went to production at Formi next month
 1. **Shadow mode** on two real workflows: compute every intent, send nothing, and compare with what humans did.
@@ -284,7 +282,7 @@ Other commands: `audit view` (supervisor screen; `reports/supervisor_view_ks_can
 
 ## Running it
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt     # for the simulator; run.sh installs the controller's own deps into .venv if missing
 python -m sim serve --scenario scenarios/public_02_incidents.yaml --run-dir runs/mine02 &
 ./run.sh http://127.0.0.1:8700                 # state in state/<scenario>.db; re-run resumes
 scripts/run_scenario.sh scenarios/public_01_dev.yaml 01      # baseline + sim + controller + grade

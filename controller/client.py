@@ -2,7 +2,6 @@
 because a 4xx is information (stale base, duplicate id, policy refusal), not a glitch."""
 from __future__ import annotations
 
-import json
 import time
 
 import httpx
@@ -65,6 +64,3 @@ class Sim:
             time.sleep(1)
         raise RuntimeError("simulator not reachable")
 
-
-def loads(line):
-    return json.loads(line)

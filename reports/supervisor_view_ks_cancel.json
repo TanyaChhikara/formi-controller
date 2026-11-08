@@ -17,35 +17,34 @@
             "V4": 0.09999999999999999
           },
           "latest_look": {
-            "V1": "3322/6612 = 50.2%",
-            "V2": "464/952 = 48.7%",
-            "V3": "482/948 = 50.8%",
-            "V4": "457/888 = 51.5%"
+            "V1": "3218/6547 = 49.1%",
+            "V2": "467/932 = 50.1%",
+            "V3": "474/969 = 48.9%",
+            "V4": "490/967 = 50.7%"
           },
           "verdict": "continue"
-        }
-      ],
-      "winning_now": [
+        },
         {
           "id": "ks_cancel:welcome_message:1",
           "cohort": "default",
           "dim": "welcome_message",
-          "status": "promoted",
+          "status": "running",
           "control": "W1",
-          "winner": "W2",
+          "winner": null,
           "traffic": {
             "W1": 0.7,
             "W2": 0.15,
             "W3": 0.15
           },
           "latest_look": {
-            "W1": "2194/4511 = 48.6%",
-            "W2": "518/974 = 53.2%",
-            "W3": "495/999 = 49.5%"
+            "W1": "3222/6559 = 49.1%",
+            "W2": "727/1416 = 51.3%",
+            "W3": "700/1440 = 48.6%"
           },
-          "verdict": "promote"
+          "verdict": "continue"
         }
       ],
+      "winning_now": [],
       "waiting_for_you": [],
       "changed_today": [],
       "cohorts": [
@@ -70,23 +69,23 @@
         },
         "credits": 3,
         "detect": {
-          "conn": 158,
-          "halluc": 11,
-          "rate": 0.0696,
+          "conn": 167,
+          "halluc": 13,
+          "rate": 0.0778,
           "baseline": 0.0147,
-          "z": 5.7,
-          "p": 3.198945979054901e-05,
+          "z": 6.8,
+          "p": 1.947552583536627e-06,
           "after_prompt_change": true
         },
         "fixed_h": 87,
         "fixed_minute": 5190,
         "verify": {
-          "conn": 228,
-          "halluc_rate": 0.0263,
-          "engagement": 0.4781,
+          "conn": 219,
+          "halluc_rate": 0.032,
+          "engagement": 0.5297,
           "baseline_engagement": 0.5067,
-          "halluc_z": 1.5,
-          "engage_z": -0.9
+          "halluc_z": 2.1,
+          "engage_z": 0.7
         }
       },
       "quarantined_caller_ids": {
@@ -98,18 +97,18 @@
           "dials": 598
         },
         "D1": {
-          "minute": 6780,
-          "pickup": 0.1592,
+          "minute": 6750,
+          "pickup": 0.1729,
           "ref": 0.2515,
-          "z": -6.8,
-          "dials": 1200
+          "z": -6.1,
+          "dials": 1400
         },
         "D3": {
-          "minute": 11400,
-          "pickup": 0.1737,
+          "minute": 11160,
+          "pickup": 0.1633,
           "ref": 0.2501,
-          "z": -4.7,
-          "dials": 800
+          "z": -6.4,
+          "dials": 1200
         }
       }
     }

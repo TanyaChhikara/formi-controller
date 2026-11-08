@@ -8,7 +8,10 @@ SC=$1; NAME=$2; PORT=${3:-8700}
 python -m sim serve --scenario "$SC" --run-dir runs/mine$NAME --force --port "$PORT" > /tmp/sim_$NAME.log 2>&1 &
 SIM=$!
 trap 'kill $SIM 2>/dev/null || true' EXIT
-until grep -q ready /tmp/sim_$NAME.log; do sleep 1; done
+until grep -q ready /tmp/sim_$NAME.log; do
+  kill -0 $SIM 2>/dev/null || { echo "simulator failed to start:"; cat /tmp/sim_$NAME.log; exit 1; }
+  sleep 1
+done
 export CONTROLLER_DB=state/run_$NAME.db
 rm -f $CONTROLLER_DB*
 ./run.sh http://127.0.0.1:$PORT

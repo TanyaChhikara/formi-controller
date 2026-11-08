@@ -1,3 +1,24 @@
+# Formi controller — submission
+
+**Start here → [`SUBMISSION.md`](SUBMISSION.md)** (design, scope decisions, results, known weaknesses).
+
+| What | Where |
+|---|---|
+| Controller | [`controller/`](controller/), started by [`run.sh`](run.sh) |
+| Grader reports | [`reports/public_01.md`](reports/public_01.md), [`reports/public_02.md`](reports/public_02.md) |
+| Load test (public_03) | [`reports/public_03.md`](reports/public_03.md), [`reports/public_03_loop_health.txt`](reports/public_03_loop_health.txt) |
+| Crash-recovery evidence | [`scripts/crash_test.sh`](scripts/crash_test.sh), [`reports/crash_test.log`](reports/crash_test.log), [`reports/crash_public_02.md`](reports/crash_public_02.md) |
+
+```bash
+./run.sh <SIM_URL>                                         # the controller (installs its deps into .venv if missing)
+scripts/run_scenario.sh scenarios/public_01_dev.yaml 01    # baseline + sim + controller + grade
+scripts/crash_test.sh 8                                    # kill -9 mid-run, restart, check consistency
+```
+
+---
+
+*Original assignment brief below.*
+
 # Outcome-First Agent Loop — Senior Engineer Assignment
 
 **Formi · Agentic Universe** · Greenfield · Suggested effort 12–16 hours across 7 calendar days

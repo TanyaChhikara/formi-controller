@@ -19,9 +19,9 @@ from .governance import Governance
 from .ingest import Ingestor
 from .policies import Brain
 from .store import Store
-from .util import fmt_minute
+from .util import fmt_minute, set_origin
 
-STEP_MINUTES = 30
+TARGET_STEP = 30   # minutes per loop; rounded to a multiple of the scenario's tick
 log = logging.getLogger("controller")
 
 
@@ -59,6 +59,10 @@ def main(argv=None):
     sim = Sim(a.url)
     sim.wait_ready()
     st0 = sim.get("/sim/state")
+    set_origin(st0["ts"], st0["sim_minute"])
+    tick = int(st0.get("tick_minutes") or 15)
+    step = tick * max(1, round(TARGET_STEP / tick))   # the sim rejects steps that aren't a multiple of its tick
+    log.info("scenario %s: tick %d min, stepping %d min", st0["scenario"], tick, step)
     db = a.db or os.environ.get("CONTROLLER_DB") or f"state/{st0['scenario']}.db"
     os.makedirs(os.path.dirname(db) or ".", exist_ok=True)
     store = open_store(sim, db)
@@ -94,7 +98,7 @@ def main(argv=None):
         if a.stop_at_minute is not None and store.now >= a.stop_at_minute:
             log.info("stopping at %s as asked", fmt_minute(store.now))
             return 3
-        sim.post("/sim/advance", {"minutes": STEP_MINUTES})
+        sim.post("/sim/advance", {"minutes": step})
     log.info("scenario finished at %s; wall %.0fs", fmt_minute(store.now), time.time() - t_start)
     return 0
 

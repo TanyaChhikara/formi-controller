@@ -1,22 +1,22 @@
 ks_cancel at D3 16:00 was running config v7, applied D3 14:30 by controller_approved; changed ["prompt_version"]
   proposal prop-ks_cancel-5100-9ea59a35 (approval), created D3 13:00: Fix hallucination incident: switch prompt P2 → P1
-  why: Hallucination flags on P2 are 7.0% of connected calls vs a 1.5% baseline (z=5.7, n=158). P1 passed validation at 98.7% (n=300). We will check engagement after the switch, since validation measures safety only.
+  why: Hallucination flags on P2 are 7.8% of connected calls vs a 1.5% baseline (z=6.8, n=167). P1 passed validation at 98.7% (n=300). We will check engagement after the switch, since validation measures safety only.
   evidence: {"validation_run_id": "val_00001"}  impact_score=1.0 affected_leads=1500
     D3 13:00  proposal_sent      Fix hallucination incident: switch prompt P2 → P1
     D3 14:30  approval_approved  apr_00005 approved
     D3 14:30  applied            config v7 applied (approval)
   approved by: the ks_cancel client approver via apr_00005 (simulated human; the API gives no name)
-  before (24h): {'dials': 4800, 'pickup': 0.2288, 'engagement': 0.4627, 'halluc_rate': 0.0264}
-  after  (24h): {'dials': 4800, 'pickup': 0.214, 'engagement': 0.5005, 'halluc_rate': 0.0185}
-  next change: v8 by controller_auto at D4 17:00 ["caller_id"]
+  before (24h): {'dials': 4800, 'pickup': 0.225, 'engagement': 0.4676, 'halluc_rate': 0.0231}
+  after  (24h): {'dials': 4800, 'pickup': 0.2042, 'engagement': 0.5153, 'halluc_rate': 0.0163}
+  next change: v8 by controller_auto at D4 16:30 ["caller_id"]
   what we decided since:
     D3 14:30  approval_approved  apr_00005 approved
     D3 14:30  applied            config v7 applied (approval)
     D3 18:00  incident_verified  fix verified
-    D4 17:00  did_flagged        caller ID D1 pickup 15.9% vs 25.1% (z=-6.8, 1200 dials in 3h): quarantined
-    D4 17:00  applied            config v8 applied (auto)
-    D4 17:30  applied            config v9 applied (auto)
-    D4 18:00  applied            config v10 applied (auto)
-    D4 18:30  applied            config v11 applied (auto)
-    D4 19:00  applied            config v12 applied (auto)
-    D4 19:30  applied            config v13 applied (auto)
+    D4 16:30  did_flagged        caller ID D1 pickup 17.3% vs 25.1% (z=-6.1, 1400 dials in 3h): quarantined
+    D4 16:30  applied            config v8 applied (auto)
+    D4 17:00  applied            config v9 applied (auto)
+    D4 17:30  applied            config v10 applied (auto)
+    D4 18:00  applied            config v11 applied (auto)
+    D4 18:30  applied            config v12 applied (auto)
+    D4 19:00  applied            config v13 applied (auto)
