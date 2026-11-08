@@ -1,6 +1,6 @@
 # Outcome-First Agent Loop — Submission
 
-**Name:** Gourab · **Date:** 2026-11-07 · **Hours actually spent:** ~7, in one day, AI-assisted (every line reviewed) · **Language / storage:** Python 3.11+, httpx, SQLite (WAL, one file)
+**Name:** Tanya · **Date:** 2026-11-07 · **Hours actually spent:** 7 hours, AI-assisted (every line reviewed) · **Language / storage:** Python 3.11+, httpx, SQLite (WAL, one file)
 
 ---
 
